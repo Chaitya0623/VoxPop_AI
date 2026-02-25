@@ -5,7 +5,6 @@ import {
   Brain,
   Upload,
   Layers,
-  ClipboardList,
   BarChart3,
   ArrowRight,
   Sparkles,
@@ -15,9 +14,8 @@ import {
 
 const STEPS = [
   { icon: Upload, title: 'Upload Dataset', description: 'Upload a CSV/JSON dataset for analysis' },
-  { icon: Brain, title: 'AI Analysis', description: 'Mock agents detect task type, risk, and tradeoffs' },
-  { icon: Layers, title: 'Scenarios', description: 'Explore 3 optimization philosophies with AutoML' },
-  { icon: ClipboardList, title: 'Community Vote', description: 'Vote on preferred tradeoffs and principles' },
+  { icon: Brain, title: 'AI Analysis', description: 'LLM agents detect task type, risk, and tradeoffs' },
+  { icon: Layers, title: 'Scenarios & Vote', description: 'Explore 3 optimization philosophies and cast your vote' },
   { icon: BarChart3, title: 'Dashboard', description: 'See community alignment and preference drift' },
 ];
 
@@ -58,7 +56,7 @@ export default function LandingPage() {
             {[
               { icon: Cpu, label: 'AutoML Engine', value: 'Simulated' },
               { icon: Users, label: 'Community Votes', value: 'Aggregated' },
-              { icon: Brain, label: 'AI Agents', value: '2 Mock' },
+              { icon: Brain, label: 'AI Agents', value: 'GPT-Powered' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center mx-auto mb-2">
@@ -76,7 +74,7 @@ export default function LandingPage() {
       <section className="border-t border-border bg-card/50 py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl font-bold text-center mb-10">How It Works</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             {STEPS.map((step, i) => (
               <div
                 key={step.title}
@@ -99,7 +97,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-6 px-4 text-center text-xs text-muted-foreground">
-        VoxPop AI — Demo MVP · Built with Next.js, Tailwind CSS, Zustand, Recharts
+        VoxPop AI — Community-Driven ML Alignment · Built with Next.js, OpenAI, Tailwind CSS, Zustand, Recharts
       </footer>
     </div>
   );

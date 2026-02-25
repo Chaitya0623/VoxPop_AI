@@ -1,10 +1,10 @@
 // ============================================================
-// VoxPop AI — Mock Scenario Agent
+// VoxPop AI — Scenario Agent
 // ============================================================
 // Generates optimization philosophies based on dataset analysis.
-// Tailored narratives for known fairness datasets; generic fallback
-// for user-uploaded data.
-// FUTURE: Replace with a real LLM call (same interface).
+// Uses OpenAI GPT when API key is available for dataset-specific
+// scenarios; falls back to curated templates for known datasets
+// and generic templates for custom uploads.
 // ============================================================
 
 import { DatasetAnalysis, Scenario } from '@/lib/types';
@@ -187,16 +187,62 @@ function genericScenarios(analysis: DatasetAnalysis): Scenario[] {
 }
 
 /**
+ * Try to generate scenarios via the LLM API route.
+ * Returns null if LLM is unavailable or fails.
+ */
+async function tryLLMScenarios(analysis: DatasetAnalysis): Promise<Scenario[] | null> {
+  try {
+    const res = await fetch('/api/scenarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: analysis.fileName,
+        taskType: analysis.taskType,
+        targetColumn: analysis.targetColumn,
+        sensitiveAttributes: analysis.sensitiveAttributes,
+        problemStatement: analysis.problemStatement,
+        riskLevel: analysis.riskAssessment.level,
+        rowCount: analysis.rowCount,
+        columnNames: analysis.columns.map((c) => c.name),
+      }),
+    });
+
+    const result = await res.json();
+
+    if (result.llmEnabled && result.scenarios && result.scenarios.length === 3) {
+      // Validate and patch scenario structure
+      return result.scenarios.map((s: Scenario) => ({
+        id: s.id,
+        title: s.title,
+        weights: s.weights,
+        narrative: s.narrative,
+        estimatedPerformance: s.estimatedPerformance,
+        whoBenefits: s.whoBenefits,
+        whoMayLose: s.whoMayLose,
+        tradeoffExplanation: s.tradeoffExplanation,
+      }));
+    }
+  } catch {
+    // LLM unavailable — fall through to template
+  }
+  return null;
+}
+
+/**
  * Generate 3 optimization scenarios given a dataset analysis.
  *
- * FUTURE: Replace body with LLM API call; keep signature unchanged.
+ * Attempts LLM generation first (if OPENAI_API_KEY is set),
+ * then falls back to curated templates for known datasets,
+ * then to generic templates.
  */
 export async function generateScenarios(
   analysis: DatasetAnalysis,
 ): Promise<Scenario[]> {
-  // Simulate processing delay
-  await new Promise((r) => setTimeout(r, 1200));
+  // Try LLM-powered generation first
+  const llmScenarios = await tryLLMScenarios(analysis);
+  if (llmScenarios) return llmScenarios;
 
+  // Fall back to curated / generic templates
   const lower = analysis.fileName.toLowerCase();
 
   if (lower.includes('compas') || lower.includes('recidivism')) {

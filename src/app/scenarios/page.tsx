@@ -6,10 +6,11 @@ import { useAppStore } from '@/store/useAppStore';
 import { generateScenarios } from '@/lib/mockAgents/scenarioAgent';
 import { runAutoML, detectDatasetHint } from '@/lib/automl/simulatedAutoML';
 import { ScenarioCard } from '@/components/ScenarioCard';
-import { AutoMLResult } from '@/lib/types';
-import { Loader2, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
+import { SurveyForm } from '@/components/SurveyForm';
+import { AutoMLResult, SurveyResponse } from '@/lib/types';
+import { generateSampleVotes } from '@/lib/sampleVotes';
+import { Loader2, ArrowRight, ArrowLeft, AlertCircle, Info, Users } from 'lucide-react';
 import Link from 'next/link';
-import { Info } from 'lucide-react';
 
 export default function ScenariosPage() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function ScenariosPage() {
     setScenarios,
     scenarioAutoMLResults,
     setScenarioAutoMLResults,
+    responses,
+    addResponse,
   } = useAppStore();
 
   const [loading, setLoading] = useState(false);
@@ -26,17 +29,15 @@ export default function ScenariosPage() {
 
   useEffect(() => {
     if (!datasetAnalysis) return;
-    if (scenarios.length > 0) return; // Already generated
+    if (scenarios.length > 0) return;
 
     const run = async () => {
       setLoading(true);
       setError('');
       try {
-        // Step 1: Generate scenarios
         const generated = await generateScenarios(datasetAnalysis);
         setScenarios(generated);
 
-        // Step 2: Run AutoML for each scenario (dataset-aware)
         const hint = detectDatasetHint(datasetAnalysis.fileName);
         const results: Record<string, AutoMLResult> = {};
         for (const s of generated) {
@@ -52,6 +53,23 @@ export default function ScenariosPage() {
 
     run();
   }, [datasetAnalysis, scenarios.length, setScenarios, setScenarioAutoMLResults]);
+
+  const handleSurveySubmit = (data: Omit<SurveyResponse, 'id' | 'timestamp'>) => {
+    const isFirstVote = responses.length === 0;
+
+    if (isFirstVote) {
+      const sampleVotes = generateSampleVotes(12);
+      sampleVotes.forEach((sv) => addResponse(sv));
+    }
+
+    const response: SurveyResponse = {
+      ...data,
+      id: `resp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+    };
+
+    addResponse(response);
+  };
 
   if (!datasetAnalysis) {
     return (
@@ -74,44 +92,43 @@ export default function ScenariosPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
+      {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Optimization Scenarios</h1>
+        <h1 className="text-3xl font-bold mb-2">Scenarios & Vote</h1>
         <p className="text-muted-foreground">
-          The AI Scenario Agent has generated 3 optimization philosophies for your dataset.
-          Each scenario comes with an AutoML model configuration.
+          Explore AI-generated optimization scenarios, then cast your vote on the preferred strategy.
         </p>
       </div>
 
       {/* Dataset Context */}
-      {datasetAnalysis && (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 mb-8">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-semibold text-primary mb-1">
-                What are we solving? — {datasetAnalysis.fileName}
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {datasetAnalysis.problemStatement}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-foreground">
-                  Task: {datasetAnalysis.taskType}
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 mb-8">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="text-sm font-semibold text-primary mb-1">
+              What are we solving? — {datasetAnalysis.fileName}
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {datasetAnalysis.problemStatement}
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-foreground">
+                Task: {datasetAnalysis.taskType}
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-foreground">
+                Target: {datasetAnalysis.targetColumn}
+              </span>
+              {datasetAnalysis.sensitiveAttributes.map((attr) => (
+                <span key={attr} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/20 text-warning">
+                  Sensitive: {attr}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-foreground">
-                  Target: {datasetAnalysis.targetColumn}
-                </span>
-                {datasetAnalysis.sensitiveAttributes.map((attr) => (
-                  <span key={attr} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/20 text-warning">
-                    Sensitive: {attr}
-                  </span>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </div>
-      )}
+      </div>
 
+      {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -121,6 +138,7 @@ export default function ScenariosPage() {
         </div>
       )}
 
+      {/* Error State */}
       {error && (
         <div className="p-4 rounded-lg bg-danger/10 border border-danger/30 flex items-center gap-3 text-sm text-danger">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -128,9 +146,17 @@ export default function ScenariosPage() {
         </div>
       )}
 
+      {/* Scenarios + Survey */}
       {!loading && scenarios.length > 0 && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold mb-1">Optimization Scenarios</h2>
+            <p className="text-sm text-muted-foreground">
+              Each scenario represents a different philosophy for training your model.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
             {scenarios.map((s) => (
               <ScenarioCard
                 key={s.id}
@@ -140,6 +166,45 @@ export default function ScenariosPage() {
             ))}
           </div>
 
+          {/* Divider */}
+          <div className="relative my-12">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-background px-4 text-sm text-muted-foreground">
+                Now cast your vote
+              </span>
+            </div>
+          </div>
+
+          {/* Survey Section */}
+          <div className="max-w-4xl mx-auto mb-10">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold mb-1">Community Vote</h2>
+                <p className="text-sm text-muted-foreground">
+                  Select your preferred scenario and set your tradeoff preferences.
+                </p>
+                {responses.length === 0 && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-accent/10 border border-accent/20 p-3">
+                    <Users className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-accent">
+                      Your first vote will also seed 12 simulated community votes to make the dashboard analysis richer.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-primary font-mono">{responses.length}</div>
+                <div className="text-xs text-muted-foreground">votes so far</div>
+              </div>
+            </div>
+
+            <SurveyForm scenarios={scenarios} onSubmit={handleSurveySubmit} />
+          </div>
+
+          {/* Navigation */}
           <div className="flex justify-between mt-10">
             <Link
               href="/upload"
@@ -148,13 +213,15 @@ export default function ScenariosPage() {
               <ArrowLeft className="w-4 h-4" />
               Back to Upload
             </Link>
-            <button
-              onClick={() => router.push('/survey')}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all"
-            >
-              Vote on Scenarios
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            {responses.length > 0 && (
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all"
+              >
+                View Dashboard
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </>
       )}

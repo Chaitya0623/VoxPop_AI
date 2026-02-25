@@ -3,20 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Brain, Upload, Layers, ClipboardList, BarChart3, RotateCcw } from 'lucide-react';
-import { useAppStore } from '@/store/useAppStore';
+import { Brain, Upload, Layers, BarChart3 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', icon: Brain },
   { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/scenarios', label: 'Scenarios', icon: Layers },
-  { href: '/survey', label: 'Survey', icon: ClipboardList },
+  { href: '/scenarios', label: 'Scenarios & Vote', icon: Layers },
   { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
 ];
 
 export function Navigation() {
   const pathname = usePathname();
-  const reset = useAppStore((s) => s.reset);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
@@ -47,16 +44,6 @@ export function Navigation() {
                 <span className="hidden sm:inline">{label}</span>
               </Link>
             ))}
-            <button
-              onClick={() => {
-                if (confirm('Reset all data? This cannot be undone.')) reset();
-              }}
-              className="ml-2 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-danger hover:bg-danger/10 transition-all"
-              title="Reset all data"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span className="hidden sm:inline">Reset</span>
-            </button>
           </div>
         </div>
       </div>

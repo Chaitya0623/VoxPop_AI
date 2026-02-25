@@ -1,9 +1,9 @@
 // ============================================================
-// VoxPop AI — Mock Dataset Agent
+// VoxPop AI — Dataset Agent
 // ============================================================
-// This module simulates an AI agent that analyzes uploaded datasets.
-// FUTURE: Replace the body of `analyzeDataset` with a real LLM API call
-//         (e.g., OpenAI, Claude) while keeping the same interface.
+// Analyzes uploaded datasets. Uses OpenAI GPT for risk
+// assessment and problem statement when API key is available,
+// falls back to heuristic analysis otherwise.
 // ============================================================
 
 import { DatasetAnalysis, DatasetColumn } from '@/lib/types';
@@ -119,19 +119,14 @@ function generateProblemStatement(
 /**
  * Analyze an uploaded dataset.
  *
- * @param fileName - Name of the uploaded file
- * @param rows     - Parsed rows (array of objects)
- *
- * FUTURE: Replace this implementation with an LLM API call.
- *         Keep the function signature identical.
+ * If the OPENAI_API_KEY is set, the risk assessment, problem statement,
+ * and sensitive attribute detection are enhanced by GPT. Otherwise,
+ * falls back to heuristic analysis.
  */
 export async function analyzeDataset(
   fileName: string,
   rows: Record<string, string | number | boolean>[],
 ): Promise<DatasetAnalysis> {
-  // Simulate processing delay (remove when using real API)
-  await new Promise((r) => setTimeout(r, 1500));
-
   if (rows.length === 0) {
     throw new Error('Dataset is empty.');
   }
@@ -153,8 +148,53 @@ export async function analyzeDataset(
   });
 
   const lastCol = columns[columns.length - 1];
-  const sensitiveAttributes = detectSensitiveAttributes(columns);
+  const heuristicSensitive = detectSensitiveAttributes(columns);
   const taskType = detectTaskType(columns, lastCol);
+
+  // Default heuristic results
+  let sensitiveAttributes = heuristicSensitive;
+  let problemStatement = generateProblemStatement(fileName, lastCol.name, taskType, sensitiveAttributes);
+  let riskAssessment = generateRiskAssessment(sensitiveAttributes, taskType);
+  let suggestedTradeoffs = [
+    'Accuracy vs. Demographic Parity',
+    'Model Complexity vs. Interpretability',
+    'Performance vs. Robustness to Distribution Shift',
+    'Individual Fairness vs. Group Fairness',
+  ];
+
+  // Try LLM enhancement
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName,
+        columns: columns.map((c) => ({ name: c.name, type: c.type, unique: c.unique, missing: c.missing })),
+        sampleRows: rows.slice(0, 5),
+        rowCount: rows.length,
+        columnCount: columns.length,
+        taskType,
+        targetColumn: lastCol.name,
+        sensitiveAttributes: heuristicSensitive,
+      }),
+    });
+
+    const llmResult = await res.json();
+
+    if (llmResult.llmEnabled) {
+      if (llmResult.problemStatement) problemStatement = llmResult.problemStatement;
+      if (llmResult.riskAssessment) riskAssessment = llmResult.riskAssessment;
+      if (llmResult.suggestedTradeoffs) suggestedTradeoffs = llmResult.suggestedTradeoffs;
+      if (llmResult.sensitiveAttributes && llmResult.sensitiveAttributes.length > 0) {
+        // Merge LLM-detected sensitive attributes with heuristic ones
+        const merged = new Set([...heuristicSensitive, ...llmResult.sensitiveAttributes]);
+        // Only keep attributes that actually exist as columns
+        sensitiveAttributes = [...merged].filter((a) => columnNames.includes(a));
+      }
+    }
+  } catch {
+    // LLM unavailable — silently use heuristic fallback
+  }
 
   return {
     fileName,
@@ -164,14 +204,9 @@ export async function analyzeDataset(
     taskType,
     targetColumn: lastCol.name,
     sensitiveAttributes,
-    problemStatement: generateProblemStatement(fileName, lastCol.name, taskType, sensitiveAttributes),
-    riskAssessment: generateRiskAssessment(sensitiveAttributes, taskType),
-    suggestedTradeoffs: [
-      'Accuracy vs. Demographic Parity',
-      'Model Complexity vs. Interpretability',
-      'Performance vs. Robustness to Distribution Shift',
-      'Individual Fairness vs. Group Fairness',
-    ],
+    problemStatement,
+    riskAssessment,
+    suggestedTradeoffs,
     previewRows: rows.slice(0, 5),
   };
 }

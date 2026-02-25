@@ -85,11 +85,11 @@ export default function DashboardPage() {
           Submit at least one vote to see community insights and the aligned model recommendation.
         </p>
         <Link
-          href="/survey"
+          href="/scenarios"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
-          Go to Survey
+          Go to Scenarios & Vote
         </Link>
       </div>
     );
@@ -235,7 +235,7 @@ export default function DashboardPage() {
       {/* Navigation */}
       <div className="flex justify-between">
         <Link
-          href="/survey"
+          href="/scenarios"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
