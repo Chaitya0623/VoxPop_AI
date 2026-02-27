@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VoxPop AI — Collective Intelligence for Machine Learning",
+  title: "VoxPop AI — Understand AI Fairness & Have Your Say",
   description:
-    "Community-driven ML alignment platform. Upload data, explore optimization strategies, vote on tradeoffs, and discover community-aligned model configurations.",
+    "Explore real-world datasets, uncover hidden biases in AI models, and contribute your values to shape fairer machine learning systems.",
 };
 
 export default function RootLayout({

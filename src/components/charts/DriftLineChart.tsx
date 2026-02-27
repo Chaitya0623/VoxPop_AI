@@ -38,7 +38,7 @@ export function DriftLineChart({ data, title }: Props) {
           <Line
             type="monotone"
             dataKey="averageAccuracyPref"
-            stroke="#6366f1"
+            stroke="#3b82f6"
             strokeWidth={2}
             dot={{ r: 4 }}
             name="Accuracy Pref"

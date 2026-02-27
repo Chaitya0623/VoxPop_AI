@@ -68,9 +68,9 @@ export function RecommendationCard({ recommendation }: Props) {
         {/* Metrics */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Accuracy', value: autoMLResult.metrics.accuracy, color: 'text-blue-400' },
-            { label: 'Fairness', value: autoMLResult.metrics.fairnessScore, color: 'text-green-400' },
-            { label: 'Robustness', value: autoMLResult.metrics.robustnessScore, color: 'text-amber-400' },
+            { label: 'Accuracy', value: autoMLResult.metrics.accuracy, color: 'text-blue-500' },
+            { label: 'Fairness', value: autoMLResult.metrics.fairnessScore, color: 'text-green-500' },
+            { label: 'Robustness', value: autoMLResult.metrics.robustnessScore, color: 'text-amber-500' },
             { label: 'Interpretability', value: autoMLResult.metrics.interpretabilityScore, color: 'text-purple-400' },
           ].map((m) => (
             <div key={m.label} className="rounded-lg bg-secondary p-3 text-center">

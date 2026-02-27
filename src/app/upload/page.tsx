@@ -25,7 +25,7 @@ function parseCSV(text: string): Record<string, string>[] {
 
 export default function UploadPage() {
   const router = useRouter();
-  const { datasetAnalysis, setDatasetAnalysis } = useAppStore();
+  const { datasetAnalysis, setDatasetAnalysis, reset } = useAppStore();
 
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -243,7 +243,17 @@ export default function UploadPage() {
         <div className="mt-8 space-y-6">
           <DatasetSummaryCard analysis={datasetAnalysis} />
 
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <button
+              onClick={() => {
+                reset();
+                setPreviewRows([]);
+              }}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Change Dataset
+            </button>
             <button
               onClick={() => router.push('/scenarios')}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all"

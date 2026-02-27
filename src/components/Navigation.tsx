@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Brain, Upload, Layers, BarChart3 } from 'lucide-react';
+import { Brain, Database, MessageSquare, User } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', icon: Brain },
-  { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/scenarios', label: 'Scenarios & Vote', icon: Layers },
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+  { href: '/datasets', label: 'Datasets', icon: Database },
+  { href: '/survey', label: 'Survey', icon: MessageSquare },
+  { href: '/profile', label: 'My Profile', icon: User },
 ];
 
 export function Navigation() {

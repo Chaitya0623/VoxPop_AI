@@ -8,10 +8,7 @@ import {
   Shield,
   TrendingUp,
   TrendingDown,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
-import { useState } from 'react';
 
 interface Props {
   scenario: Scenario;
@@ -19,6 +16,8 @@ interface Props {
   selected?: boolean;
   onSelect?: () => void;
   selectable?: boolean;
+  /** When true, renders a compact card without details (for vote selection) */
+  compact?: boolean;
 }
 
 const SCENARIO_ICONS: Record<string, React.ElementType> = {
@@ -39,8 +38,14 @@ const SCENARIO_ACCENT: Record<string, string> = {
   'scenario-c': 'text-green-400',
 };
 
-export function ScenarioCard({ scenario, autoMLResult, selected, onSelect, selectable }: Props) {
-  const [expanded, setExpanded] = useState(false);
+/** Uniform metric colors used across the entire app */
+const WEIGHT_BARS = [
+  { label: 'Accuracy', key: 'accuracy' as const, color: 'bg-blue-500' },
+  { label: 'Fairness', key: 'fairness' as const, color: 'bg-green-500' },
+  { label: 'Robustness', key: 'robustness' as const, color: 'bg-amber-500' },
+];
+
+export function ScenarioCard({ scenario, autoMLResult, selected, onSelect, selectable, compact }: Props) {
   const Icon = SCENARIO_ICONS[scenario.id] || Zap;
   const colorClass = SCENARIO_COLORS[scenario.id] || '';
   const accentClass = SCENARIO_ACCENT[scenario.id] || 'text-primary';
@@ -64,9 +69,9 @@ export function ScenarioCard({ scenario, autoMLResult, selected, onSelect, selec
           <div>
             <h3 className="font-semibold text-base">{scenario.title}</h3>
             <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-              <span>Acc: {scenario.weights.accuracy}%</span>
-              <span>Fair: {scenario.weights.fairness}%</span>
-              <span>Rob: {scenario.weights.robustness}%</span>
+              <span className="text-blue-400">Acc: {scenario.weights.accuracy}%</span>
+              <span className="text-green-400">Fair: {scenario.weights.fairness}%</span>
+              <span className="text-amber-400">Rob: {scenario.weights.robustness}%</span>
             </div>
           </div>
         </div>
@@ -86,20 +91,16 @@ export function ScenarioCard({ scenario, autoMLResult, selected, onSelect, selec
 
       {/* Weight bars */}
       <div className="space-y-1.5 mb-4">
-        {[
-          { label: 'Accuracy', value: scenario.weights.accuracy, color: 'bg-blue-500' },
-          { label: 'Fairness', value: scenario.weights.fairness, color: 'bg-green-500' },
-          { label: 'Robustness', value: scenario.weights.robustness, color: 'bg-amber-500' },
-        ].map((bar) => (
+        {WEIGHT_BARS.map((bar) => (
           <div key={bar.label} className="flex items-center gap-2 text-xs">
             <span className="w-16 text-muted-foreground">{bar.label}</span>
             <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
               <div
                 className={cn('h-full rounded-full transition-all duration-700', bar.color)}
-                style={{ width: `${bar.value}%` }}
+                style={{ width: `${scenario.weights[bar.key]}%` }}
               />
             </div>
-            <span className="w-8 text-right font-mono">{bar.value}%</span>
+            <span className="w-8 text-right font-mono">{scenario.weights[bar.key]}%</span>
           </div>
         ))}
       </div>
@@ -134,20 +135,9 @@ export function ScenarioCard({ scenario, autoMLResult, selected, onSelect, selec
         </div>
       )}
 
-      {/* Expandable details */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setExpanded(!expanded);
-        }}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-        {expanded ? 'Less' : 'More'} details
-      </button>
-
-      {expanded && (
-        <div className="mt-3 space-y-3 text-sm animate-fade-in">
+      {/* Details — always visible unless compact mode */}
+      {!compact && (
+        <div className="mt-3 space-y-3 text-sm">
           <div className="rounded-lg bg-card p-3 border border-border">
             <div className="font-medium text-xs text-muted-foreground mb-1">Estimated Performance</div>
             <p className="text-xs font-mono">{scenario.estimatedPerformance}</p>

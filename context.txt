@@ -1,0 +1,178 @@
+===============================================================
+VoxPop AI — File Context Map
+===============================================================
+Use this file as the single source of truth for what each file
+does. Update it whenever a file is added, renamed, or changed
+in purpose.
+===============================================================
+
+── src/app/ ────────────────────────────────────────────────────
+
+page.tsx
+  Landing page. Hero section, "How It Works" 4-step grid, quick
+  stats (AutoML, Votes, AI Agents), footer. Links to /upload.
+
+layout.tsx
+  Root layout. Dark theme, Geist fonts, <Navigation /> rendered
+  above all pages. Sets page <title> and meta description.
+
+globals.css
+  Tailwind CSS import + CSS custom properties for the dark theme
+  (--primary, --accent, --success, --warning, --danger, etc.).
+  Custom scrollbar, fadeIn / pulse-glow keyframes.
+
+── src/app/upload/ ─────────────────────────────────────────────
+
+page.tsx
+  Upload page. Drag-and-drop CSV/JSON zone + 3 sample Kaggle
+  dataset buttons. Parses file, calls analyzeDataset() agent,
+  stores result in Zustand, shows DatasetSummaryCard + preview
+  table, "Generate Scenarios" button → /scenarios.
+
+── src/app/scenarios/ ──────────────────────────────────────────
+
+page.tsx
+  Combined Scenarios + Vote page. On mount, calls
+  generateScenarios() and runAutoML() per scenario. Renders
+  ScenarioCards, then SurveyForm for voting. First-vote seeding
+  injects 12 sample votes. Navigation: back to /upload, forward
+  to /dashboard.
+
+── src/app/dashboard/ ──────────────────────────────────────────
+
+page.tsx
+  Analytics dashboard. Computes community insights from votes.
+  Renders: summary stats (total responses, polarization, stability,
+  trend), ScenarioPieChart, PrincipleBarChart, DriftLineChart,
+  RecommendationCard. Link back to /scenarios to add more votes.
+
+── src/app/api/analyze/ ────────────────────────────────────────
+
+route.ts
+  POST endpoint. Sends dataset metadata + sample rows to GPT-4o-mini
+  for risk assessment, problem statement, sensitive attributes,
+  and tradeoffs. Returns { llmEnabled: false } when no API key.
+
+── src/app/api/scenarios/ ──────────────────────────────────────
+
+route.ts
+  POST endpoint. Sends dataset context to GPT-4o-mini to generate
+  3 optimization scenarios (accuracy-first, balanced, fairness-first).
+  Returns { llmEnabled: false } when no API key.
+
+── src/components/ ─────────────────────────────────────────────
+
+Navigation.tsx
+  Top nav bar. 4 items: Home, Upload, Scenarios & Vote, Dashboard.
+  Highlights active route. VoxPop AI logo/link.
+
+ScenarioCard.tsx
+  Displays one optimization scenario. Weight bars (Accuracy /
+  Fairness / Robustness), narrative, AutoML result, and expanded
+  detail section (estimated performance, who benefits, who may
+  lose, tradeoff explanation). Supports selectable mode for voting.
+
+SurveyForm.tsx
+  Community vote form. 4 steps: (1) select scenario via
+  ScenarioCards in selectable mode, (2) accuracy-vs-fairness
+  slider, (3) guiding principle picker, (4) confidence rating.
+  Submit button stores vote.
+
+DatasetSummaryCard.tsx
+  Overview card for an analyzed dataset. Shows filename, row/col
+  counts, task type, target column, sensitive attributes, risk
+  assessment badge + details, suggested tradeoff dimensions.
+
+RecommendationCard.tsx
+  Community-aligned model recommendation. Shows aggregated
+  community weights (bars), selected model type, metrics grid,
+  hyperparameters, support percentage, justification text.
+
+── src/components/charts/ ──────────────────────────────────────
+
+ScenarioPieChart.tsx
+  Recharts donut chart for scenario vote distribution.
+
+PrincipleBarChart.tsx
+  Recharts horizontal bar chart for guiding principle distribution.
+
+DriftLineChart.tsx
+  Recharts line chart for accuracy/fairness preference drift
+  over time. Two lines: Accuracy Pref, Fairness Pref.
+
+── src/lib/ ────────────────────────────────────────────────────
+
+types.ts
+  All TypeScript interfaces: DatasetColumn, DatasetAnalysis,
+  ObjectiveWeights, Scenario, AutoMLResult, SurveyResponse,
+  CommunityInsights, CommunityRecommendation, AppState.
+
+openai.ts
+  Server-side OpenAI SDK singleton. getOpenAIClient() returns
+  client or null, isLLMEnabled() checks if API key is valid.
+
+analytics.ts
+  Pure functions: computeCommunityWeights (aggregate votes →
+  ObjectiveWeights), computeInsights (votes → scenario split,
+  principle split, preference drift, polarization, stability,
+  trend), computeSupportPercentage.
+
+sampleDatasets.ts
+  3 built-in Kaggle fairness datasets: COMPAS Recidivism,
+  Adult Census Income, German Credit Risk. Each has 20 rows,
+  metadata, and a fairness problem statement.
+
+sampleVotes.ts
+  generateSampleVotes(count) produces deterministic community
+  vote profiles to seed the dashboard on first real vote.
+
+utils.ts
+  cn() helper — clsx + tailwind-merge for conditional class names.
+
+── src/lib/automl/ ─────────────────────────────────────────────
+
+simulatedAutoML.ts
+  Simulated AutoML engine. Takes ObjectiveWeights → selects
+  model type, generates hyperparameters, computes metrics,
+  returns AutoMLResult. Dataset-aware via DatasetHint system.
+
+── src/lib/mockAgents/ ─────────────────────────────────────────
+
+datasetAgent.ts
+  Dataset analysis agent. Parses columns, infers types, detects
+  sensitive attributes, risk assessment, problem statement.
+  Tries LLM (/api/analyze) first, falls back to heuristics.
+
+scenarioAgent.ts
+  Scenario generation agent. Tries LLM (/api/scenarios) first,
+  falls back to curated templates (COMPAS / Adult / German) or
+  generic templates.
+
+── src/store/ ──────────────────────────────────────────────────
+
+useAppStore.ts
+  Zustand store with localStorage persistence. State: dataset-
+  Analysis, scenarios, scenarioAutoMLResults, responses,
+  recommendation. Actions: set*, addResponse, reset.
+
+── Config Files ────────────────────────────────────────────────
+
+.env.local          OPENAI_API_KEY (real key or empty for heuristic mode)
+.env.example        Placeholder for OPENAI_API_KEY
+package.json        Next.js 16, React 19, Zustand 5, Recharts 3, openai SDK
+next.config.ts      Default Next.js config
+tsconfig.json       TypeScript config with @/ path alias
+tailwind.config.ts  (if present) Tailwind 4 config
+context.txt         THIS FILE — file-level context map
+
+── Color Conventions ───────────────────────────────────────────
+
+Accuracy:    blue    (#3b82f6 / bg-blue-500 / text-blue-400)
+Fairness:    green   (#22c55e / bg-green-500 / text-green-400)
+Robustness:  amber   (#f59e0b / bg-amber-500 / text-amber-400)
+
+These colors are used uniformly across:
+  - ScenarioCard weight bars
+  - RecommendationCard weight bars + metric grid
+  - SurveyForm accuracy/fairness slider labels
+  - DriftLineChart line colors (accuracy=blue, fairness=green)

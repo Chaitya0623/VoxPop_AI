@@ -80,6 +80,7 @@ export function SurveyForm({ scenarios, onSubmit }: Props) {
               selected={selectedScenario === s.id}
               onSelect={() => setSelectedScenario(s.id)}
               selectable
+              compact
             />
           ))}
         </div>

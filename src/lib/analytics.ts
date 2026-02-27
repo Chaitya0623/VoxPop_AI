@@ -149,3 +149,46 @@ export function computeSupportPercentage(
 
   return +((supporters.length / responses.length) * 100).toFixed(1);
 }
+
+/**
+ * Compute how a user's inferred weights compare to the community average.
+ * Returns a divergence score from 0 (identical) to 100 (maximally different).
+ */
+export function computeWeightDivergence(
+  userWeights: ObjectiveWeights,
+  communityWeights: ObjectiveWeights,
+): number {
+  const dAcc = Math.abs(userWeights.accuracy - communityWeights.accuracy);
+  const dFair = Math.abs(userWeights.fairness - communityWeights.fairness);
+  const dRob = Math.abs(userWeights.robustness - communityWeights.robustness);
+  // Max possible divergence is 200 (one weight at 100 vs 0, for two dimensions)
+  return +((dAcc + dFair + dRob) / 2).toFixed(1);
+}
+
+/**
+ * Compute aggregate inferred weights from responses that have them.
+ * Falls back to the legacy accuracyVsFairness-based computation.
+ */
+export function computeInferredCommunityWeights(
+  responses: SurveyResponse[],
+): ObjectiveWeights | null {
+  const withInferred = responses.filter((r) => r.inferredWeights);
+  if (withInferred.length === 0) return null;
+
+  let totalAcc = 0;
+  let totalFair = 0;
+  let totalRob = 0;
+
+  for (const r of withInferred) {
+    totalAcc += r.inferredWeights!.accuracy;
+    totalFair += r.inferredWeights!.fairness;
+    totalRob += r.inferredWeights!.robustness;
+  }
+
+  const n = withInferred.length;
+  return {
+    accuracy: Math.round(totalAcc / n),
+    fairness: Math.round(totalFair / n),
+    robustness: Math.round(totalRob / n),
+  };
+}
