@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Upload,
@@ -16,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart3,
+  CheckCircle2,
+  Target,
+  Crosshair,
 } from 'lucide-react';
 import { analyzeDataset } from '@/lib/mockAgents/datasetAgent';
 import { detectStructuralAsymmetries, enrichWithDatasetContext } from '@/lib/structuralAnalysis';
@@ -28,7 +31,7 @@ import { runMonteCarloAllocation } from '@/lib/automl/monteCarloAllocator';
 import { useAppStore } from '@/store/useAppStore';
 import { SAMPLE_DATASETS, SampleDataset } from '@/lib/sampleDatasets';
 import { cn } from '@/lib/utils';
-import { AutoMLResult, CommunityRecommendation, ObjectiveWeights } from '@/lib/types';
+import { AutoMLResult, CommunityRecommendation, DatasetDecision, ObjectiveWeights } from '@/lib/types';
 
 function parseCSV(text: string): Record<string, string>[] {
   const lines = text.trim().split('\n');
@@ -59,10 +62,20 @@ function generateJustification(weights: ObjectiveWeights): string {
   return map[dominant];
 }
 
+// Analysis pipeline steps for the loader
+const ANALYSIS_STEPS = [
+  { label: 'Parsing data schema & columns', icon: Database },
+  { label: 'Detecting sensitive attributes', icon: Shield },
+  { label: 'Analyzing structural asymmetries', icon: Brain },
+  { label: 'Generating fairness scenarios', icon: Crosshair },
+  { label: 'Running AutoML model selection', icon: BarChart3 },
+  { label: 'Seeding community votes', icon: Target },
+  { label: 'Computing community recommendation', icon: Sparkles },
+];
+
 export default function DatasetsPage() {
   const router = useRouter();
   const {
-    datasetAnalysis,
     setDatasetAnalysis,
     setStructuralAsymmetries,
     setScenarios,
@@ -70,7 +83,6 @@ export default function DatasetsPage() {
     setValueQuestions,
     addResponse,
     setRecommendation,
-    responses,
     reset,
   } = useAppStore();
 
@@ -82,26 +94,44 @@ export default function DatasetsPage() {
   const [dragOver, setDragOver] = useState(false);
   const [expandedDataset, setExpandedDataset] = useState<string | null>(null);
 
+  // Decision picker state
+  const [pendingDataset, setPendingDataset] = useState<SampleDataset | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<DatasetDecision | null>(null);
+
+  // Step-by-step loader state
+  const [currentStep, setCurrentStep] = useState(0);
+  const stepRef = useRef(0);
+
+  const advanceStep = () => {
+    stepRef.current = Math.min(stepRef.current + 1, ANALYSIS_STEPS.length);
+    setCurrentStep(stepRef.current);
+  };
+
   const selectAndAnalyze = useCallback(
-    async (dataset: SampleDataset) => {
+    async (dataset: SampleDataset, decision: DatasetDecision | null) => {
       setError('');
       setSelectedId(dataset.id);
       setAnalyzing(true);
+      stepRef.current = 0;
+      setCurrentStep(0);
 
       try {
         // Reset previous data
         reset();
 
         // Step 1: Analyze dataset
-        const analysis = await analyzeDataset(dataset.fileName, dataset.rows);
+        advanceStep();
+        const analysis = await analyzeDataset(dataset.fileName, dataset.rows, decision);
         setDatasetAnalysis(analysis);
 
         // Step 2: Detect structural asymmetries
+        advanceStep();
         let asymmetries = detectStructuralAsymmetries(analysis, dataset.rows);
         asymmetries = enrichWithDatasetContext(asymmetries, analysis.fileName);
         setStructuralAsymmetries(asymmetries);
 
         // Step 3: Generate scenarios + value questions in parallel
+        advanceStep();
         const [generated, questions] = await Promise.all([
           generateScenarios(analysis),
           generateValueQuestions(analysis, asymmetries),
@@ -110,6 +140,7 @@ export default function DatasetsPage() {
         setValueQuestions(questions);
 
         // Step 4: Run AutoML for each scenario
+        advanceStep();
         const hint = detectDatasetHint(analysis.fileName);
         const results: Record<string, AutoMLResult> = {};
         for (const s of generated) {
@@ -118,10 +149,12 @@ export default function DatasetsPage() {
         setScenarioAutoMLResults(results);
 
         // Step 5: Seed sample community votes so dashboard has data
+        advanceStep();
         const sampleVotes = generateSampleVotes(15);
         sampleVotes.forEach((sv) => addResponse(sv));
 
         // Step 6: Compute community recommendation
+        advanceStep();
         const allResponses = [...useAppStore.getState().responses];
         const communityWeights = computeCommunityWeights(allResponses);
         const primaryAsymmetry = asymmetries[0] || null;
@@ -138,6 +171,10 @@ export default function DatasetsPage() {
         };
         setRecommendation(rec);
 
+        // All done
+        advanceStep();
+        await new Promise((r) => setTimeout(r, 400));
+
         // Redirect to dashboard
         router.push('/dashboard');
       } catch (err) {
@@ -145,6 +182,8 @@ export default function DatasetsPage() {
       } finally {
         setAnalyzing(false);
         setSelectedId(null);
+        setPendingDataset(null);
+        setSelectedDecision(null);
       }
     },
     [reset, setDatasetAnalysis, setStructuralAsymmetries, setScenarios, setValueQuestions, setScenarioAutoMLResults, addResponse, setRecommendation, router],
@@ -154,6 +193,8 @@ export default function DatasetsPage() {
     async (file: File) => {
       setError('');
       setLoading(true);
+      stepRef.current = 0;
+      setCurrentStep(0);
       try {
         const text = await file.text();
         let rows: Record<string, string | number | boolean>[];
@@ -168,13 +209,16 @@ export default function DatasetsPage() {
         if (rows.length === 0) throw new Error('No data rows found in file.');
 
         reset();
+        advanceStep();
         const analysis = await analyzeDataset(file.name, rows);
         setDatasetAnalysis(analysis);
 
+        advanceStep();
         let asymmetries = detectStructuralAsymmetries(analysis, rows);
         asymmetries = enrichWithDatasetContext(asymmetries, analysis.fileName);
         setStructuralAsymmetries(asymmetries);
 
+        advanceStep();
         const [generated, questions] = await Promise.all([
           generateScenarios(analysis),
           generateValueQuestions(analysis, asymmetries),
@@ -182,9 +226,12 @@ export default function DatasetsPage() {
         setScenarios(generated);
         setValueQuestions(questions);
 
+        advanceStep();
         const sampleVotes = generateSampleVotes(15);
         sampleVotes.forEach((sv) => addResponse(sv));
 
+        advanceStep();
+        await new Promise((r) => setTimeout(r, 300));
         router.push('/dashboard');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to process file.');
@@ -225,16 +272,77 @@ export default function DatasetsPage() {
         </p>
       </div>
 
-      {/* Analyzing overlay */}
+      {/* ── Step-by-Step Analysis Overlay ── */}
       {isProcessing && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-          <div className="text-center space-y-4 animate-fade-in">
-            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-            <div>
-              <p className="text-lg font-semibold">Analyzing dataset...</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Detecting structural biases, generating insights & computing community recommendations
+        <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center">
+          <div className="max-w-md w-full mx-4 animate-fade-in">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="relative w-16 h-16 mx-auto mb-4">
+                <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+                <div className="relative w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Brain className="w-8 h-8 text-primary animate-pulse" />
+                </div>
+              </div>
+              <h2 className="text-xl font-bold mb-1">Analyzing Dataset</h2>
+              <p className="text-sm text-muted-foreground">
+                {pendingDataset?.name || 'Your file'}{selectedDecision ? ` — ${selectedDecision.name}` : ''}
               </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-1.5 bg-border rounded-full mb-6 overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(currentStep / ANALYSIS_STEPS.length) * 100}%` }}
+              />
+            </div>
+
+            {/* Step list */}
+            <div className="space-y-3">
+              {ANALYSIS_STEPS.map((step, i) => {
+                const isActive = i === currentStep - 1;
+                const isDone = i < currentStep - 1;
+                const isPending = i >= currentStep;
+                const StepIcon = step.icon;
+
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-300',
+                      isActive && 'bg-primary/10 border border-primary/30',
+                      isDone && 'opacity-60',
+                      isPending && 'opacity-30',
+                    )}
+                  >
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+                      {isDone ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-400" />
+                      ) : isActive ? (
+                        <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                      ) : (
+                        <StepIcon className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      isActive && 'text-primary',
+                      isDone && 'text-green-400',
+                      isPending && 'text-muted-foreground',
+                    )}>
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Current step indicator */}
+            <div className="mt-6 text-center">
+              <span className="text-xs text-muted-foreground font-mono">
+                Step {Math.min(currentStep, ANALYSIS_STEPS.length)} of {ANALYSIS_STEPS.length}
+              </span>
             </div>
           </div>
         </div>
@@ -245,6 +353,98 @@ export default function DatasetsPage() {
         <div className="mb-6 p-4 rounded-lg bg-danger/10 border border-danger/30 flex items-center gap-3 text-sm text-danger">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           {error}
+        </div>
+      )}
+
+      {/* ── Decision Picker Modal ── */}
+      {pendingDataset && !isProcessing && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-card border border-border rounded-2xl shadow-2xl animate-fade-in overflow-hidden">
+            {/* Modal header */}
+            <div className="px-6 py-5 border-b border-border bg-secondary/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">Choose a Decision Lens</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    <span className="font-medium text-foreground">{pendingDataset.name}</span> — What question should the AI answer?
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setPendingDataset(null); setSelectedDecision(null); }}
+                  className="text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-secondary transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            {/* Decision options */}
+            <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+              {pendingDataset.decisions.map((dec) => (
+                <button
+                  key={dec.id}
+                  onClick={() => setSelectedDecision(dec)}
+                  className={cn(
+                    'w-full text-left rounded-xl border p-4 transition-all',
+                    selectedDecision?.id === dec.id
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                      : 'border-border hover:border-primary/40 hover:bg-card/80',
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn(
+                      'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
+                      selectedDecision?.id === dec.id ? 'bg-primary/20' : 'bg-secondary',
+                    )}>
+                      <Crosshair className={cn(
+                        'w-4 h-4',
+                        selectedDecision?.id === dec.id ? 'text-primary' : 'text-muted-foreground',
+                      )} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm mb-1">{dec.name}</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-2">{dec.description}</p>
+                      {/* Objectives */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {dec.objectives.map((obj, i) => (
+                          <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                            {obj}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Modal footer */}
+            <div className="px-6 py-4 border-t border-border bg-secondary/20 flex items-center justify-end gap-3">
+              <button
+                onClick={() => { setPendingDataset(null); setSelectedDecision(null); }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingDataset) {
+                    selectAndAnalyze(pendingDataset, selectedDecision);
+                  }
+                }}
+                disabled={!selectedDecision}
+                className={cn(
+                  'inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all',
+                  selectedDecision
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-secondary text-muted-foreground cursor-not-allowed',
+                )}
+              >
+                Analyze with this lens
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -283,6 +483,9 @@ export default function DatasetsPage() {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span className="px-2 py-0.5 rounded-full bg-secondary">{ds.domain}</span>
                           <span>{ds.rows.length} rows · {ds.columns.length} features</span>
+                          <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                            {ds.decisions.length} decisions
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -293,15 +496,11 @@ export default function DatasetsPage() {
 
                   <div className="flex flex-col gap-2 flex-shrink-0">
                     <button
-                      onClick={() => selectAndAnalyze(ds)}
+                      onClick={() => { setPendingDataset(ds); setSelectedDecision(null); }}
                       disabled={isProcessing}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 whitespace-nowrap"
                     >
-                      {analyzing && selectedId === ds.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <BarChart3 className="w-4 h-4" />
-                      )}
+                      <BarChart3 className="w-4 h-4" />
                       Analyze
                     </button>
                     <button
@@ -318,6 +517,22 @@ export default function DatasetsPage() {
               {/* Expanded section */}
               {isExpanded && (
                 <div className="border-t border-border px-5 py-4 bg-secondary/30 animate-fade-in space-y-4">
+                  {/* Decisions preview */}
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-primary mb-2">
+                      <Crosshair className="w-3.5 h-3.5" />
+                      Available Decision Lenses
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {ds.decisions.map((dec) => (
+                        <div key={dec.id} className="rounded-lg border border-border bg-card/50 p-3">
+                          <h4 className="text-xs font-semibold mb-1">{dec.name}</h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{dec.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Why fairness matters */}
                   <div>
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-warning mb-1.5">

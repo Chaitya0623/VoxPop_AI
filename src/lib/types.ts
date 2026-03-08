@@ -4,6 +4,15 @@
 
 // ---- Dataset Agent Types ----
 
+export interface DatasetDecision {
+  id: string;
+  name: string;
+  description: string;
+  targetColumn: string;
+  problemStatement: string;
+  objectives: string[];
+}
+
 export interface DatasetColumn {
   name: string;
   type: 'numeric' | 'categorical' | 'boolean' | 'text' | 'date';
@@ -28,6 +37,8 @@ export interface DatasetAnalysis {
   };
   suggestedTradeoffs: string[];
   previewRows: Record<string, string | number | boolean>[];
+  /** The active decision lens chosen by the user (null = default target) */
+  activeDecision?: DatasetDecision | null;
 }
 
 // ---- Structural Analysis Types ----

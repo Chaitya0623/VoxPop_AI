@@ -6,7 +6,7 @@
 // falls back to heuristic analysis otherwise.
 // ============================================================
 
-import { DatasetAnalysis, DatasetColumn } from '@/lib/types';
+import { DatasetAnalysis, DatasetColumn, DatasetDecision } from '@/lib/types';
 
 /** Infer column type from sample values */
 function inferColumnType(values: (string | number | boolean | null)[]): DatasetColumn['type'] {
@@ -126,6 +126,7 @@ function generateProblemStatement(
 export async function analyzeDataset(
   fileName: string,
   rows: Record<string, string | number | boolean>[],
+  decision?: DatasetDecision | null,
 ): Promise<DatasetAnalysis> {
   if (rows.length === 0) {
     throw new Error('Dataset is empty.');
@@ -153,7 +154,8 @@ export async function analyzeDataset(
 
   // Default heuristic results
   let sensitiveAttributes = heuristicSensitive;
-  let problemStatement = generateProblemStatement(fileName, lastCol.name, taskType, sensitiveAttributes);
+  const effectiveTarget = decision?.targetColumn || lastCol.name;
+  let problemStatement = decision?.problemStatement || generateProblemStatement(fileName, effectiveTarget, taskType, sensitiveAttributes);
   let riskAssessment = generateRiskAssessment(sensitiveAttributes, taskType);
   let suggestedTradeoffs = [
     'Accuracy vs. Demographic Parity',
@@ -202,11 +204,12 @@ export async function analyzeDataset(
     columnCount: columns.length,
     columns,
     taskType,
-    targetColumn: lastCol.name,
+    targetColumn: effectiveTarget,
     sensitiveAttributes,
     problemStatement,
     riskAssessment,
     suggestedTradeoffs,
     previewRows: rows.slice(0, 5),
+    activeDecision: decision || null,
   };
 }

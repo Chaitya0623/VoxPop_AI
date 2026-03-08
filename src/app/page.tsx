@@ -73,7 +73,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-xl sm:text-2xl text-muted-foreground mb-4 animate-fade-in leading-relaxed max-w-2xl mx-auto">
-            Understand how AI decisions impact different communities — and have your say in making them fairer.
+            Making AI fairer, one voice at a time.
           </p>
 
           <p className="text-base text-muted-foreground/70 mb-10 animate-fade-in max-w-xl mx-auto">

@@ -10,6 +10,8 @@
 //   German Credit Risk   – Kaggle / UCI ML Repository
 // ============================================================
 
+import { DatasetDecision } from '@/lib/types';
+
 export interface SampleDataset {
   id: string;
   name: string;
@@ -24,6 +26,7 @@ export interface SampleDataset {
   columns: string[];
   targetColumn: string;
   sensitiveAttributes: string[];
+  decisions: DatasetDecision[];
 }
 
 // ---- Seeded helpers ----
@@ -192,6 +195,32 @@ export const SAMPLE_DATASETS: SampleDataset[] = [
     targetColumn: 'two_year_recid',
     sensitiveAttributes: ['race', 'sex'],
     rows: buildCompasRows(),
+    decisions: [
+      {
+        id: 'compas-recidivism',
+        name: 'Recidivism Prediction',
+        description: 'Predict whether a defendant will re-offend within two years — the original COMPAS use case.',
+        targetColumn: 'two_year_recid',
+        problemStatement: 'Predict whether a criminal defendant will re-offend within two years. The challenge: build a recidivism prediction model that is accurate enough to inform judicial decisions without systematically discriminating against Black defendants.',
+        objectives: ['Minimize false positives for minority groups', 'Maximize prediction accuracy', 'Equalize error rates across races'],
+      },
+      {
+        id: 'compas-bail',
+        name: 'Bail Amount Recommendation',
+        description: 'Recommend appropriate bail amounts based on risk factors, criminal history, and community ties.',
+        targetColumn: 'decile_score',
+        problemStatement: 'Recommend bail amounts that balance flight risk with the defendant\'s ability to pay. The challenge: higher bail disproportionately impacts low-income defendants, who are overwhelmingly Black and Hispanic — creating a two-tier justice system based on wealth.',
+        objectives: ['Minimize pre-trial detention of low-risk defendants', 'Account for socioeconomic disparities', 'Maintain court appearance rates'],
+      },
+      {
+        id: 'compas-rehab',
+        name: 'Rehabilitation Program Assignment',
+        description: 'Decide which defendants should be assigned to rehabilitation programs vs. standard sentencing.',
+        targetColumn: 'two_year_recid',
+        problemStatement: 'Assign defendants to rehabilitation programs that reduce recidivism most effectively. The challenge: if the model over-predicts risk for Black defendants, they may be denied rehabilitative opportunities and funneled into harsher sentencing — perpetuating the cycle.',
+        objectives: ['Maximize rehabilitation success rates', 'Ensure equitable access to programs', 'Reduce overall recidivism'],
+      },
+    ],
   },
   {
     id: 'adult-income',
@@ -210,6 +239,32 @@ export const SAMPLE_DATASETS: SampleDataset[] = [
     targetColumn: 'income',
     sensitiveAttributes: ['sex', 'race'],
     rows: buildAdultRows(),
+    decisions: [
+      {
+        id: 'adult-income-pred',
+        name: 'Income Prediction',
+        description: 'Predict whether an individual earns more than $50K per year — the classic census benchmark.',
+        targetColumn: 'income',
+        problemStatement: 'Predict whether an individual earns more than $50K per year based on census attributes. The challenge: historical wage data reflects systemic gender and racial pay gaps — a high-accuracy model risks encoding and perpetuating these disparities.',
+        objectives: ['Minimize gender-based prediction gaps', 'Maximize overall prediction accuracy', 'Ensure equal opportunity across races'],
+      },
+      {
+        id: 'adult-job-placement',
+        name: 'Job Placement Recommendation',
+        description: 'Recommend job categories or career paths based on an individual\'s education, skills, and background.',
+        targetColumn: 'occupation',
+        problemStatement: 'Recommend suitable job placements based on census attributes. The challenge: if the model learns that women are historically concentrated in lower-paying occupations, it may perpetuate occupational segregation rather than recommending based on actual capability.',
+        objectives: ['Break occupational segregation patterns', 'Match skills to opportunities fairly', 'Account for education-occupation mismatches'],
+      },
+      {
+        id: 'adult-benefit-eligibility',
+        name: 'Social Benefit Eligibility',
+        description: 'Determine eligibility for social assistance programs based on income prediction and demographic factors.',
+        targetColumn: 'income',
+        problemStatement: 'Screen individuals for social benefit eligibility using predicted income levels. The challenge: false positives (predicting high income for low earners) deny benefits to those who need them most, and these errors disproportionately affect women and minorities.',
+        objectives: ['Minimize false denials for vulnerable groups', 'Prevent gaming of eligibility criteria', 'Balance program costs with coverage'],
+      },
+    ],
   },
   {
     id: 'german-credit',
@@ -228,5 +283,31 @@ export const SAMPLE_DATASETS: SampleDataset[] = [
     targetColumn: 'risk',
     sensitiveAttributes: ['sex', 'age'],
     rows: buildGermanRows(),
+    decisions: [
+      {
+        id: 'german-risk',
+        name: 'Credit Risk Classification',
+        description: 'Classify applicants as good or bad credit risk — the standard lending decision.',
+        targetColumn: 'risk',
+        problemStatement: 'Classify bank loan applicants as good or bad credit risk. The challenge: an accuracy-optimized model may systematically deny credit to younger applicants, women, and foreign workers while appearing objective.',
+        objectives: ['Equalize approval rates across genders', 'Maximize default prediction accuracy', 'Comply with EU AI Act requirements'],
+      },
+      {
+        id: 'german-loan-amount',
+        name: 'Loan Amount Recommendation',
+        description: 'Recommend appropriate loan amounts based on risk profile, income stability, and repayment capacity.',
+        targetColumn: 'credit_amount',
+        problemStatement: 'Recommend loan amounts that borrowers can realistically repay. The challenge: if the model learns that women and young people historically receive smaller loans, it may cap their amounts even when their financial profiles warrant more — limiting wealth-building opportunities.',
+        objectives: ['Remove gender bias in amount recommendations', 'Match loan size to actual repayment capacity', 'Support financial inclusion for young borrowers'],
+      },
+      {
+        id: 'german-interest-rate',
+        name: 'Interest Rate Setting',
+        description: 'Set personalized interest rates based on individual risk assessment and market conditions.',
+        targetColumn: 'risk',
+        problemStatement: 'Set interest rates that reflect actual default risk without discriminatory pricing. The challenge: risk-based pricing can result in higher rates for protected groups (women, younger borrowers), effectively charging them more for the same service — a practice the EU considers potentially discriminatory.',
+        objectives: ['Prevent discriminatory pricing', 'Reflect genuine default risk', 'Ensure rate transparency and explainability'],
+      },
+    ],
   },
 ];

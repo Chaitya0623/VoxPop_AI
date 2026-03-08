@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { generateValueQuestions } from '@/lib/mockAgents/valueQuestionAgent';
 import { detectStructuralAsymmetries, enrichWithDatasetContext } from '@/lib/structuralAnalysis';
@@ -14,6 +14,7 @@ import {
   SurveyResponse,
   PersonalRecommendation,
   DatasetAnalysis,
+  DatasetDecision,
   StructuralAsymmetry,
   ValueQuestion,
 } from '@/lib/types';
@@ -34,9 +35,19 @@ import {
   Columns3,
   Eye,
   CheckCircle2,
+  Crosshair,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+
+// Analysis pipeline steps for the survey loader
+const SURVEY_STEPS = [
+  { label: 'Parsing data schema & columns', icon: Database },
+  { label: 'Detecting sensitive attributes', icon: Shield },
+  { label: 'Analyzing structural asymmetries', icon: Brain },
+  { label: 'Generating tailored questions', icon: Crosshair },
+  { label: 'Preparing your survey', icon: Sparkles },
+];
 
 const DOMAIN_CONFIG: Record<string, { color: string; bg: string; border: string; icon: string }> = {
   'Criminal Justice': { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', icon: '⚖️' },
@@ -46,8 +57,9 @@ const DOMAIN_CONFIG: Record<string, { color: string; bg: string; border: string;
 
 const HOW_IT_WORKS = [
   { step: 1, title: 'Pick a Dataset', description: 'Choose a real-world fairness dataset to explore', icon: Database },
-  { step: 2, title: 'Answer Questions', description: 'Respond to bias-aware questions tailored to the data', icon: MessageSquare },
-  { step: 3, title: 'Get Your Recommendation', description: 'See a personalized AI model allocation based on your values', icon: BarChart3 },
+  { step: 2, title: 'Choose a Decision', description: 'Select what AI decision to examine — multiple lenses per dataset', icon: Crosshair },
+  { step: 3, title: 'Answer Questions', description: 'Respond to bias-aware questions tailored to the decision', icon: MessageSquare },
+  { step: 4, title: 'Get Your Recommendation', description: 'See a personalized AI model allocation based on your values', icon: BarChart3 },
 ];
 
 export default function SurveyPage() {
@@ -62,23 +74,55 @@ export default function SurveyPage() {
   const [loading, setLoading] = useState(false);
   const [computingPersonal, setComputingPersonal] = useState(false);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<DatasetDecision | null>(null);
+  const [showDecisionPicker, setShowDecisionPicker] = useState(false);
 
-  const handleDatasetSelect = async (dsId: string) => {
-    const ds = SAMPLE_DATASETS.find((d) => d.id === dsId);
-    if (!ds) return;
+  // Step-by-step loader state
+  const [currentStep, setCurrentStep] = useState(0);
+  const stepRef = useRef(0);
+
+  const advanceStep = () => {
+    stepRef.current = Math.min(stepRef.current + 1, SURVEY_STEPS.length);
+    setCurrentStep(stepRef.current);
+  };
+
+  const handleDatasetSelect = (dsId: string) => {
     setSelectedDatasetId(dsId);
+    setShowDecisionPicker(true);
+  };
+
+  const handleDecisionSelect = async (decision: DatasetDecision) => {
+    const ds = SAMPLE_DATASETS.find((d) => d.id === selectedDatasetId);
+    if (!ds) return;
+    setSelectedDecision(decision);
+    setShowDecisionPicker(false);
     setLoading(true);
     setLocalPersonalRec(null);
+    stepRef.current = 0;
+    setCurrentStep(0);
     try {
-      const analysis = await analyzeDataset(ds.fileName, ds.rows);
+      // Step 1: Parse schema
+      advanceStep();
+      const analysis = await analyzeDataset(ds.fileName, ds.rows, decision);
       setLocalAnalysis(analysis);
 
+      // Step 2: Detect sensitive attributes
+      advanceStep();
+
+      // Step 3: Analyze asymmetries
+      advanceStep();
       let asymmetries = detectStructuralAsymmetries(analysis, ds.rows);
       asymmetries = enrichWithDatasetContext(asymmetries, analysis.fileName);
       setLocalAsymmetries(asymmetries);
 
+      // Step 4: Generate questions
+      advanceStep();
       const questions = await generateValueQuestions(analysis, asymmetries);
       setLocalQuestions(questions);
+
+      // Step 5: Ready
+      advanceStep();
+      await new Promise((r) => setTimeout(r, 400));
     } finally {
       setLoading(false);
     }
@@ -146,7 +190,7 @@ export default function SurveyPage() {
     }
   };
 
-  const showPicker = !localAnalysis || (!localQuestions.length && !loading);
+  const showPicker = !showDecisionPicker && (!localAnalysis || (!localQuestions.length && !loading));
   const userResponses = responses.filter((r) => !r.id.startsWith('sample-'));
 
   return (
@@ -347,32 +391,136 @@ export default function SurveyPage() {
         </>
       )}
 
+      {/* ── DECISION PICKER VIEW ── */}
+      {showDecisionPicker && !loading && (() => {
+        const ds = SAMPLE_DATASETS.find((d) => d.id === selectedDatasetId);
+        if (!ds) return null;
+        const cfg = DOMAIN_CONFIG[ds.domain] || DOMAIN_CONFIG['Finance'];
+        return (
+          <div className="max-w-3xl mx-auto px-4 py-16 animate-fade-in">
+            <button
+              onClick={() => { setShowDecisionPicker(false); setSelectedDatasetId(null); }}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors mb-6 flex items-center gap-1"
+            >
+              ← Back to datasets
+            </button>
+
+            <div className="text-center mb-10">
+              <span className="text-3xl mb-3 block">{cfg.icon}</span>
+              <h2 className="text-2xl font-bold mb-2">{ds.name}</h2>
+              <p className="text-muted-foreground text-sm max-w-lg mx-auto">
+                Choose a decision lens — each one examines a different AI decision this data could power, with unique fairness tradeoffs.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              {ds.decisions.map((decision) => (
+                <button
+                  key={decision.id}
+                  onClick={() => handleDecisionSelect(decision)}
+                  className="w-full text-left rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 p-5 transition-all group"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Crosshair className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-base mb-1 group-hover:text-primary transition-colors">{decision.name}</h3>
+                        <p className="text-sm text-muted-foreground mb-3 leading-relaxed">{decision.description}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {decision.objectives.map((obj) => (
+                            <span key={obj} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                              {obj}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-2">
+                      Begin
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── LOADING STATE ── */}
       {loading && (
-        <div className="max-w-4xl mx-auto px-4 py-10">
-          <div className="flex flex-col items-center justify-center py-24 gap-5">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center">
+          <div className="w-full max-w-md mx-auto px-6">
+            <div className="text-center mb-8">
+              <div className="relative inline-flex mb-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Brain className="w-3.5 h-3.5 text-amber-400" />
+                </div>
               </div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Brain className="w-3.5 h-3.5 text-amber-400" />
-              </div>
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold mb-1">Analyzing Dataset</h3>
+              <h3 className="text-lg font-semibold mb-1">Preparing Your Survey</h3>
               <p className="text-sm text-muted-foreground">
                 Detecting structural biases & generating tailored questions...
               </p>
             </div>
-            {/* Animated steps */}
-            <div className="flex flex-col gap-2 mt-2">
-              {['Parsing data schema', 'Detecting asymmetries', 'Generating value questions'].map((s, i) => (
-                <div key={s} className="flex items-center gap-2 text-xs text-muted-foreground animate-fade-in" style={{ animationDelay: `${i * 400}ms` }}>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  {s}
-                </div>
-              ))}
+
+            {/* Progress bar */}
+            <div className="h-1.5 bg-secondary rounded-full mb-6 overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(currentStep / SURVEY_STEPS.length) * 100}%` }}
+              />
+            </div>
+
+            {/* Step list */}
+            <div className="space-y-3">
+              {SURVEY_STEPS.map((step, i) => {
+                const isActive = i === currentStep - 1;
+                const isDone = i < currentStep - 1;
+                const isPending = i >= currentStep;
+                const StepIcon = step.icon;
+
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-300',
+                      isActive && 'bg-primary/10 border border-primary/30',
+                      isDone && 'opacity-60',
+                      isPending && 'opacity-30',
+                    )}
+                  >
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+                      {isDone ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-400" />
+                      ) : isActive ? (
+                        <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                      ) : (
+                        <StepIcon className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      isActive && 'text-primary',
+                      isDone && 'text-green-400',
+                      isPending && 'text-muted-foreground',
+                    )}>
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Current step indicator */}
+            <div className="mt-6 text-center">
+              <span className="text-xs text-muted-foreground font-mono">
+                Step {Math.min(currentStep, SURVEY_STEPS.length)} of {SURVEY_STEPS.length}
+              </span>
             </div>
           </div>
         </div>
@@ -390,6 +538,9 @@ export default function SurveyPage() {
                   <div>
                     <h3 className="text-sm font-semibold text-primary mb-1">
                       Survey for: {localAnalysis.fileName.replace('.csv', '').replace(/_/g, ' ')}
+                      {selectedDecision && (
+                        <span className="text-muted-foreground font-normal"> — {selectedDecision.name}</span>
+                      )}
                     </h3>
                     <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
                       {localAnalysis.problemStatement}
@@ -403,6 +554,8 @@ export default function SurveyPage() {
                     setLocalAsymmetries([]);
                     setLocalPersonalRec(null);
                     setSelectedDatasetId(null);
+                    setSelectedDecision(null);
+                    setShowDecisionPicker(false);
                   }}
                   className="text-xs px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 whitespace-nowrap"
                 >
