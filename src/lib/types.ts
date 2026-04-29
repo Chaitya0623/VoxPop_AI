@@ -231,6 +231,84 @@ export interface CommunityRecommendation {
   supportPercentage: number;
   /** NEW: community-level Monte Carlo allocation (null if not enough data) */
   monteCarloResult?: MonteCarloResult | null;
+  /** NEW: research-informed evidence metadata */
+  researchEvidence?: ResearchEvidence | null;
+}
+
+// ---- Research / Paper Knowledge Types ----
+
+export interface PaperRecord {
+  id: string;
+  source_context?: {
+    origin?: string;
+    group?: string;
+    note?: string;
+  };
+  metadata_confidence?: string;
+  paper?: {
+    title?: string;
+    authors?: string;
+    year?: number | null;
+    venue?: string | null;
+    doi?: string | null;
+    url?: string | null;
+  };
+  problem_type?: string;
+  domain?: string;
+  decision_stage?: string;
+  setting?: {
+    constraints?: string[];
+    sensitive_attributes?: string[];
+  };
+  method?: {
+    name?: string;
+    category?: string;
+    description?: string;
+  };
+  fairness_definition?: string;
+  objective?: string;
+  tradeoffs?: {
+    accuracy?: string | number;
+    fairness_gain?: string | number;
+    implementation_cost?: string | number;
+  };
+  requirements?: string[];
+  tags?: string[];
+}
+
+export interface PaperSummary {
+  id: string;
+  title: string;
+  year?: number;
+  venue?: string;
+  problemType?: string;
+  domain?: string;
+  fairnessDefinition?: string;
+  methodCategory?: string;
+}
+
+export interface AllocationProfile {
+  fairnessEmphasis: number;
+  efficiencyEmphasis: number;
+  robustnessEmphasis: number;
+  constraints: string[];
+}
+
+export interface PaperPrior {
+  weights: ObjectiveWeights;
+  modelScores: Record<ModelType, number>;
+  allocationProfile: AllocationProfile;
+  matchedPapers: PaperSummary[];
+  signals: string[];
+}
+
+export interface ResearchEvidence {
+  enabled: boolean;
+  matchedPapers: PaperSummary[];
+  matchedSignals: string[];
+  paperPriorWeights: ObjectiveWeights;
+  blendedWeights: ObjectiveWeights;
+  modelRanking: { model: ModelType; score: number }[];
 }
 
 // ---- App State ----

@@ -6,7 +6,8 @@
 //         FLAML, H2O) while keeping the same interface.
 // ============================================================
 
-import { AutoMLResult, ModelType, ObjectiveWeights, Hyperparameters, ModelMetrics } from '@/lib/types';
+import { AutoMLResult, ModelType, ObjectiveWeights, Hyperparameters, ModelMetrics, PaperPrior } from '@/lib/types';
+import { rankCandidateModels } from '@/lib/paperKnowledge';
 
 /** Known dataset hints for model selection */
 export type DatasetHint = 'compas' | 'adult-income' | 'german-credit' | 'generic';
@@ -33,8 +34,43 @@ function seededRandom(seed: string): () => number {
   };
 }
 
-function selectModelType(weights: ObjectiveWeights, rand: () => number, hint: DatasetHint): ModelType {
+function selectModelType(
+  weights: ObjectiveWeights,
+  rand: () => number,
+  hint: DatasetHint,
+  paperPrior?: PaperPrior | null,
+): ModelType {
   const { accuracy, fairness, robustness } = weights;
+
+  if (paperPrior) {
+    const hintBias: Record<ModelType, number> = {
+      LogisticRegression: 0,
+      RandomForest: 0,
+      XGBoost: 0,
+      GradientBoosting: 0,
+      SVM: 0,
+    };
+    if (hint === 'compas' || hint === 'german-credit') {
+      hintBias.LogisticRegression += 0.4;
+      hintBias.RandomForest += 0.2;
+    }
+    if (hint === 'adult-income') {
+      hintBias.XGBoost += 0.4;
+      hintBias.GradientBoosting += 0.2;
+    }
+
+    const combinedScores: Record<ModelType, number> = {
+      LogisticRegression: paperPrior.modelScores.LogisticRegression + hintBias.LogisticRegression,
+      RandomForest: paperPrior.modelScores.RandomForest + hintBias.RandomForest,
+      XGBoost: paperPrior.modelScores.XGBoost + hintBias.XGBoost,
+      GradientBoosting: paperPrior.modelScores.GradientBoosting + hintBias.GradientBoosting,
+      SVM: paperPrior.modelScores.SVM + hintBias.SVM,
+    };
+
+    const ranked = rankCandidateModels(weights, combinedScores);
+    const preferred = ranked[0]?.model;
+    if (preferred) return preferred;
+  }
 
   // Dataset-specific model preferences
   if (hint === 'compas') {
@@ -72,13 +108,19 @@ function selectModelType(weights: ObjectiveWeights, rand: () => number, hint: Da
   return 'RandomForest';
 }
 
-function generateHyperparameters(modelType: ModelType, rand: () => number): Hyperparameters {
+function generateHyperparameters(
+  modelType: ModelType,
+  rand: () => number,
+  weights?: ObjectiveWeights,
+): Hyperparameters {
+  const fairness = weights?.fairness || 0;
+  const accuracy = weights?.accuracy || 0;
   switch (modelType) {
     case 'XGBoost':
       return {
-        n_estimators: Math.round(100 + rand() * 400),
-        max_depth: Math.round(3 + rand() * 7),
-        learning_rate: +(0.01 + rand() * 0.19).toFixed(3),
+        n_estimators: Math.round(100 + rand() * (accuracy > 60 ? 500 : 350)),
+        max_depth: Math.round(3 + rand() * (fairness > 55 ? 4 : 8)),
+        learning_rate: +(0.01 + rand() * (accuracy > 60 ? 0.22 : 0.16)).toFixed(3),
         subsample: +(0.6 + rand() * 0.4).toFixed(2),
         colsample_bytree: +(0.5 + rand() * 0.5).toFixed(2),
         reg_alpha: +(rand() * 1).toFixed(2),
@@ -86,24 +128,24 @@ function generateHyperparameters(modelType: ModelType, rand: () => number): Hype
       };
     case 'GradientBoosting':
       return {
-        n_estimators: Math.round(100 + rand() * 300),
-        max_depth: Math.round(3 + rand() * 5),
-        learning_rate: +(0.01 + rand() * 0.14).toFixed(3),
-        min_samples_split: Math.round(2 + rand() * 8),
-        min_samples_leaf: Math.round(1 + rand() * 4),
+        n_estimators: Math.round(100 + rand() * (accuracy > 60 ? 350 : 250)),
+        max_depth: Math.round(3 + rand() * (fairness > 55 ? 3 : 6)),
+        learning_rate: +(0.01 + rand() * (accuracy > 60 ? 0.16 : 0.12)).toFixed(3),
+        min_samples_split: Math.round(2 + rand() * (fairness > 55 ? 6 : 10)),
+        min_samples_leaf: Math.round(1 + rand() * (fairness > 55 ? 5 : 4)),
       };
     case 'RandomForest':
       return {
-        n_estimators: Math.round(100 + rand() * 400),
-        max_depth: Math.round(5 + rand() * 15),
-        min_samples_split: Math.round(2 + rand() * 8),
-        min_samples_leaf: Math.round(1 + rand() * 4),
+        n_estimators: Math.round(100 + rand() * (accuracy > 60 ? 450 : 320)),
+        max_depth: Math.round(5 + rand() * (fairness > 55 ? 10 : 16)),
+        min_samples_split: Math.round(2 + rand() * (fairness > 55 ? 10 : 8)),
+        min_samples_leaf: Math.round(1 + rand() * (fairness > 55 ? 6 : 4)),
         max_features: rand() > 0.5 ? 'sqrt' : 'log2',
         bootstrap: true,
       };
     case 'LogisticRegression':
       return {
-        C: +(0.01 + rand() * 9.99).toFixed(3),
+        C: +(0.01 + rand() * (fairness > 55 ? 4.5 : 9.99)).toFixed(3),
         penalty: rand() > 0.5 ? 'l2' : 'l1',
         solver: 'saga',
         max_iter: Math.round(500 + rand() * 500),
@@ -111,7 +153,7 @@ function generateHyperparameters(modelType: ModelType, rand: () => number): Hype
       };
     case 'SVM':
       return {
-        C: +(0.1 + rand() * 9.9).toFixed(3),
+        C: +(0.1 + rand() * (fairness > 55 ? 4.5 : 9.9)).toFixed(3),
         kernel: rand() > 0.5 ? 'rbf' : 'linear',
         gamma: 'scale',
         class_weight: 'balanced',
@@ -174,6 +216,7 @@ export async function runAutoML(
   weights: ObjectiveWeights,
   seed?: string,
   datasetHint?: DatasetHint,
+  paperPrior?: PaperPrior | null,
 ): Promise<AutoMLResult> {
   // Simulate computation
   await new Promise((r) => setTimeout(r, 800));
@@ -182,8 +225,8 @@ export async function runAutoML(
   const rand = seededRandom(seedStr);
 
   const hint = datasetHint || 'generic';
-  const modelType = selectModelType(weights, rand, hint);
-  const hyperparameters = generateHyperparameters(modelType, rand);
+  const modelType = selectModelType(weights, rand, hint, paperPrior);
+  const hyperparameters = generateHyperparameters(modelType, rand, paperPrior?.weights || weights);
   const metrics = computeMetrics(weights, modelType, rand);
   const compositeScore = computeCompositeScore(weights, metrics);
 

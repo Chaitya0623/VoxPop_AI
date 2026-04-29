@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
-import { computeInsights, computeCommunityWeights, computeSupportPercentage } from '@/lib/analytics';
+import { computeInsights, computeCommunityWeights, computeSupportPercentage, computeBlendedCommunityWeights } from '@/lib/analytics';
 import { runAutoML, detectDatasetHint } from '@/lib/automl/simulatedAutoML';
 import { runMonteCarloAllocation } from '@/lib/automl/monteCarloAllocator';
-import { CommunityRecommendation, ObjectiveWeights } from '@/lib/types';
+import { CommunityRecommendation, ObjectiveWeights, PaperRecord, PaperPrior, ResearchEvidence } from '@/lib/types';
+import { inferPaperPriors, explainRecommendation, rankCandidateModels } from '@/lib/paperKnowledge';
 import { RecommendationCard } from '@/components/RecommendationCard';
 import { PersonalResultCard } from '@/components/PersonalResultCard';
 import { CommunityComparisonCard } from '@/components/CommunityComparisonCard';
@@ -60,34 +61,95 @@ export default function DashboardPage() {
   } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'community' | 'personal'>('community');
+  const [paperCorpus, setPaperCorpus] = useState<PaperRecord[]>([]);
+  const [paperPrior, setPaperPrior] = useState<PaperPrior | null>(null);
+  const [researchEvidence, setResearchEvidence] = useState<ResearchEvidence | null>(null);
 
   const insights = useMemo(() => computeInsights(responses), [responses]);
   const communityWeights = useMemo(() => computeCommunityWeights(responses), [responses]);
 
   useEffect(() => {
+    let active = true;
+    const loadPapers = async () => {
+      try {
+        const res = await fetch('/api/papers');
+        const data = await res.json();
+        if (!active) return;
+        setPaperCorpus(data.papers || []);
+      } catch (err) {
+        if (!active) return;
+        setPaperCorpus([]);
+      }
+    };
+
+    loadPapers();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (responses.length === 0) return;
-    if (recommendation) return;
+    const shouldRecompute = !recommendation || (paperCorpus.length > 0 && !recommendation.researchEvidence);
+    if (!shouldRecompute) return;
 
     const computeRecommendation = async () => {
       setLoading(true);
       try {
         const hint = detectDatasetHint(datasetAnalysis?.fileName);
         const primaryAsymmetry = structuralAsymmetries[0] || null;
+        const domain = datasetAnalysis?.fileName?.toLowerCase().includes('compas')
+          ? 'criminal_justice'
+          : datasetAnalysis?.fileName?.toLowerCase().includes('adult')
+          ? 'economics'
+          : datasetAnalysis?.fileName?.toLowerCase().includes('german')
+          ? 'finance'
+          : 'general';
+
+        const problemType = datasetAnalysis?.taskType || 'classification';
+        const fairnessDefinition = datasetAnalysis?.sensitiveAttributes?.length ? 'equity' : undefined;
+        const constraints = datasetAnalysis?.sensitiveAttributes?.length ? ['historical_bias'] : [];
+
+        const prior = paperCorpus.length > 0
+          ? inferPaperPriors(paperCorpus, {
+              problemType,
+              domain,
+              fairnessDefinition,
+              constraints,
+              sensitiveAttributes: datasetAnalysis?.sensitiveAttributes || [],
+            })
+          : null;
+
+        const blendedWeights = computeBlendedCommunityWeights(responses, prior || undefined);
+        const rankedModels = prior ? rankCandidateModels(blendedWeights, prior.modelScores) : [];
+        const evidence = prior
+          ? explainRecommendation(datasetAnalysis, prior, blendedWeights, rankedModels, {
+              domain,
+              fairnessDefinition,
+              problemType,
+            })
+          : null;
+
+        setPaperPrior(prior);
+        setResearchEvidence(evidence);
 
         // Run AutoML + Monte Carlo for community weights
         const [autoMLResult, mcResult] = await Promise.all([
-          runAutoML(communityWeights, 'community', hint),
-          runMonteCarloAllocation(communityWeights, primaryAsymmetry, 200, 'community'),
+          runAutoML(blendedWeights, 'community', hint, prior),
+          runMonteCarloAllocation(blendedWeights, primaryAsymmetry, 200, 'community', prior?.allocationProfile || null),
         ]);
-        const supportPercentage = computeSupportPercentage(responses, communityWeights);
-        const justification = generateJustification(communityWeights);
+        const supportPercentage = computeSupportPercentage(responses, blendedWeights);
+        const justification = prior
+          ? `${generateJustification(blendedWeights)} Research priors from ${prior.matchedPapers.length} papers were blended with community history to refine the selection.`
+          : generateJustification(blendedWeights);
 
         const rec: CommunityRecommendation = {
-          communityWeights,
+          communityWeights: blendedWeights,
           autoMLResult,
           justification,
           supportPercentage,
           monteCarloResult: mcResult,
+          researchEvidence: evidence,
         };
         setRecommendation(rec);
       } finally {
@@ -96,7 +158,7 @@ export default function DashboardPage() {
     };
 
     computeRecommendation();
-  }, [responses, recommendation, communityWeights, setRecommendation, datasetAnalysis, structuralAsymmetries]);
+  }, [responses, recommendation, communityWeights, setRecommendation, datasetAnalysis, structuralAsymmetries, paperCorpus]);
 
   if (responses.length === 0) {
     return (
@@ -285,6 +347,39 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 py-12 justify-center">
                 <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 <span className="text-sm text-muted-foreground">Computing community-aligned model & allocation...</span>
+              </div>
+            )}
+            {recommendation?.researchEvidence?.enabled && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-emerald-300 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-emerald-200 mb-1">Research-Informed Recommendation</h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Model selection blended literature priors with past and current community responses.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {recommendation.researchEvidence.matchedSignals.map((signal) => (
+                        <span key={signal} className="px-2 py-0.5 rounded-full bg-secondary text-xs text-muted-foreground">
+                          {signal}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="grid gap-2">
+                      {recommendation.researchEvidence.matchedPapers.slice(0, 4).map((paper) => (
+                        <div key={paper.id} className="rounded-md border border-border bg-secondary/60 p-2">
+                          <div className="text-xs font-semibold text-foreground">{paper.title}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {paper.venue || 'Literature'}{paper.year ? ` • ${paper.year}` : ''} • {paper.methodCategory || 'general'}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {paper.problemType || 'general'} • {paper.domain || 'general'} • {paper.fairnessDefinition || 'not_explicit'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             {recommendation && <RecommendationCard recommendation={recommendation} />}

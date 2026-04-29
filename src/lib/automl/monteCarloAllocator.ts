@@ -20,6 +20,7 @@ import {
   StructuralAsymmetry,
   AllocationArm,
   MonteCarloResult,
+  AllocationProfile,
 } from '@/lib/types';
 
 /** Deterministic pseudo-random from a seed string */
@@ -177,6 +178,7 @@ export async function runMonteCarloAllocation(
   asymmetry: StructuralAsymmetry | null,
   numRuns: number = 200,
   seed: string = 'mc-default',
+  allocationProfile?: AllocationProfile | null,
 ): Promise<MonteCarloResult> {
   // Simulate computation delay
   await new Promise((r) => setTimeout(r, 600));
@@ -184,9 +186,11 @@ export async function runMonteCarloAllocation(
   const profiles = buildGroupProfiles(asymmetry);
   const numGroups = profiles.length;
 
-  // Fairness weight factor: 0 to 1
-  const fairnessWeight = weights.fairness / 100;
-  const accuracyWeight = weights.accuracy / 100;
+  // Fairness weight factor: 0 to 1, optionally blended with research priors
+  const fairnessPrior = allocationProfile ? allocationProfile.fairnessEmphasis / 100 : 0;
+  const efficiencyPrior = allocationProfile ? allocationProfile.efficiencyEmphasis / 100 : 0;
+  const fairnessWeight = Math.min(1, weights.fairness / 100 * 0.7 + fairnessPrior * 0.3);
+  const accuracyWeight = Math.min(1, weights.accuracy / 100 * 0.7 + efficiencyPrior * 0.3);
 
   // Generate allocation grid
   const allocationGrid = generateAllocationGrid(numGroups, 20);

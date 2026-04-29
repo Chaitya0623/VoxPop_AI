@@ -2,14 +2,28 @@
 
 import { CommunityRecommendation } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Award, Cpu, BarChart3, Users } from 'lucide-react';
+import { Award, Cpu, BarChart3, Users, BookOpen, Sparkles } from 'lucide-react';
 
 interface Props {
   recommendation: CommunityRecommendation;
 }
 
 export function RecommendationCard({ recommendation }: Props) {
-  const { communityWeights, autoMLResult, justification, supportPercentage } = recommendation;
+  const { communityWeights, autoMLResult, justification, supportPercentage, researchEvidence } = recommendation;
+  const researchEnabled = Boolean(researchEvidence?.enabled && researchEvidence.matchedPapers.length > 0);
+  const blendedWeights = researchEvidence?.blendedWeights;
+  const paperWeights = researchEvidence?.paperPriorWeights;
+  const dominant = blendedWeights
+    ? blendedWeights.accuracy >= blendedWeights.fairness && blendedWeights.accuracy >= blendedWeights.robustness
+      ? 'Accuracy'
+      : blendedWeights.fairness >= blendedWeights.robustness
+      ? 'Fairness'
+      : 'Robustness'
+    : communityWeights.accuracy >= communityWeights.fairness && communityWeights.accuracy >= communityWeights.robustness
+      ? 'Accuracy'
+      : communityWeights.fairness >= communityWeights.robustness
+      ? 'Fairness'
+      : 'Robustness';
 
   return (
     <div className="animate-fade-in rounded-xl border border-primary/30 bg-primary/5 p-6 space-y-5 animate-pulse-glow">
@@ -21,9 +35,14 @@ export function RecommendationCard({ recommendation }: Props) {
         <div>
           <h3 className="font-bold text-xl">Community-Aligned Model</h3>
           <p className="text-sm text-muted-foreground">
-            Aggregated from community preferences
+            {researchEnabled ? 'Blended with research priors and community preferences' : 'Aggregated from community preferences'}
           </p>
         </div>
+        {researchEnabled && (
+          <span className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300">
+            <Sparkles className="w-3.5 h-3.5" /> Research-informed
+          </span>
+        )}
       </div>
 
       {/* Community Weights */}
@@ -114,6 +133,66 @@ export function RecommendationCard({ recommendation }: Props) {
         <h4 className="text-sm font-medium text-muted-foreground mb-2">Justification</h4>
         <p className="text-sm text-secondary-foreground leading-relaxed">{justification}</p>
       </div>
+
+      <div className="rounded-lg bg-card border border-border p-4">
+        <h4 className="text-sm font-medium text-muted-foreground mb-2">Inference Summary</h4>
+        <p className="text-sm text-secondary-foreground leading-relaxed">
+          We infer a {dominant.toLowerCase()}-leaning recommendation based on the blended evidence. The model
+          selection reflects this emphasis while preserving the other objectives at non-trivial weights.
+        </p>
+      </div>
+
+      {researchEnabled && paperWeights && blendedWeights && (
+        <div className="rounded-lg bg-card border border-border p-4 space-y-4">
+          <h4 className="text-sm font-medium text-muted-foreground">Blended Evidence Weights</h4>
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Paper Prior Weights</div>
+            {[
+              { label: 'Accuracy', value: paperWeights.accuracy, color: 'bg-blue-500' },
+              { label: 'Fairness', value: paperWeights.fairness, color: 'bg-green-500' },
+              { label: 'Robustness', value: paperWeights.robustness, color: 'bg-amber-500' },
+            ].map((bar) => (
+              <div key={bar.label} className="flex items-center gap-3 text-xs mb-2">
+                <span className="w-20 text-muted-foreground">{bar.label}</span>
+                <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                  <div className={cn('h-full rounded-full', bar.color)} style={{ width: `${bar.value}%` }} />
+                </div>
+                <span className="w-10 text-right font-mono font-semibold">{bar.value}%</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Blended Weights</div>
+            {[
+              { label: 'Accuracy', value: blendedWeights.accuracy, color: 'bg-blue-500' },
+              { label: 'Fairness', value: blendedWeights.fairness, color: 'bg-green-500' },
+              { label: 'Robustness', value: blendedWeights.robustness, color: 'bg-amber-500' },
+            ].map((bar) => (
+              <div key={bar.label} className="flex items-center gap-3 text-xs mb-2">
+                <span className="w-20 text-muted-foreground">{bar.label}</span>
+                <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                  <div className={cn('h-full rounded-full', bar.color)} style={{ width: `${bar.value}%` }} />
+                </div>
+                <span className="w-10 text-right font-mono font-semibold">{bar.value}%</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Blended weights combine literature priors with community history and recent responses.
+          </div>
+        </div>
+      )}
+
+      {researchEnabled && (
+        <div className="rounded-lg bg-card border border-border p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <BookOpen className="w-4 h-4" /> Research Evidence Available
+          </div>
+          <div className="text-xs text-muted-foreground">
+            See the research-informed block above for paper context and matches.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   ObjectiveWeights,
   PreferenceDriftPoint,
   GuidingPrinciple,
+  PaperPrior,
 } from '@/lib/types';
 
 const PRINCIPLE_LABELS: Record<GuidingPrinciple, string> = {
@@ -190,5 +191,50 @@ export function computeInferredCommunityWeights(
     accuracy: Math.round(totalAcc / n),
     fairness: Math.round(totalFair / n),
     robustness: Math.round(totalRob / n),
+  };
+}
+
+/**
+ * Compute weights from the most recent responses to represent short-term shifts.
+ */
+export function computeRecentCommunityWeights(
+  responses: SurveyResponse[],
+  recentCount: number = 10,
+): ObjectiveWeights | null {
+  if (responses.length === 0) return null;
+  const slice = responses.slice(-recentCount);
+  const inferred = computeInferredCommunityWeights(slice);
+  return inferred || computeCommunityWeights(slice);
+}
+
+/**
+ * Blend community weights with paper-derived priors without replacing votes.
+ */
+export function computeBlendedCommunityWeights(
+  responses: SurveyResponse[],
+  paperPrior?: PaperPrior | null,
+): ObjectiveWeights {
+  const base = computeInferredCommunityWeights(responses) || computeCommunityWeights(responses);
+  if (!paperPrior) return base;
+
+  const recent = computeRecentCommunityWeights(responses);
+
+  const blended = {
+    accuracy: base.accuracy * 0.6 + paperPrior.weights.accuracy * 0.25,
+    fairness: base.fairness * 0.6 + paperPrior.weights.fairness * 0.25,
+    robustness: base.robustness * 0.6 + paperPrior.weights.robustness * 0.25,
+  };
+
+  if (recent) {
+    blended.accuracy += recent.accuracy * 0.15;
+    blended.fairness += recent.fairness * 0.15;
+    blended.robustness += recent.robustness * 0.15;
+  }
+
+  const total = blended.accuracy + blended.fairness + blended.robustness;
+  return {
+    accuracy: Math.round((blended.accuracy / total) * 100),
+    fairness: Math.round((blended.fairness / total) * 100),
+    robustness: 100 - Math.round((blended.accuracy / total) * 100) - Math.round((blended.fairness / total) * 100),
   };
 }

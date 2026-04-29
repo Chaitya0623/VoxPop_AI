@@ -1,0 +1,101 @@
+Wicked Problems
+Roles for computing in social change
+Social impact operations at the global base of the pyramid
+Application-Driven Innovation in Machine Learning
+Envisioning Communities: A Participatory Approach Towards AI for Social Good
+Come to us first: Centering Community Organizations in Artificial Intelligence for Social Good Partnerships
+The Practical, Robust Implementation and Sustainability (PRISM)-capabilities model for use of Artificial Intelligence in community-engaged implementation science research
+Participation Is Not a Design Fix for Machine Learning
+Statistical Modeling: The Two Cultures
+Using values in operations research
+Prediction Policy Problems
+The Value of Prediction in Identifying the Worst-Off
+Against Predictive Optimization: On the Legitimacy of Decision-making Algorithms That Optimize Predictive Accuracy
+Measuring the predictability of life outcomes with a scientific mass collaboration
+What Has a Foundation Model Found? Using Inductive Bias to Probe for World Models?
+Mantis: A Simulation-Grounded Foundation Model for Disease Forecasting
+Optimizing the Path Towards Plastic-Free Oceans
+Solving Connected Subgraph Problems in Wildlife Conservation
+General rules for managing and surveying networks of pests, diseases, and endangered species
+Strategic planning of prevention and surveillance for emerging diseases and invasive species
+Simple and Approximately Optimal Contracts for Payment for Ecosystem Services
+Incentivizing Smallholder Farmer Sustainability under Behavioral Regularities
+A Framework for Understanding Sources of Harm throughout the Machine Learning Life Cycle
+Why Is My Classifier Discriminatory?
+Mitigating allocative tradeoffs and harms in an environmental justice data tool
+Learning to Be Fair: A Consequentialist Approach to Equitable Decision Making
+Assessing Algorithmic Fairness with Unobserved Protected Class Using Data Combination
+Learning optimal and fair decision trees for non-discriminative decision-making
+Generative Social Choice
+Iterative Reasoning Preference Optimization
+WeBuildAI: Participatory Framework for Algorithmic Governance
+Improving the Security of United States Elections with Robust Optimization
+Finding long chains in kidney exchange using the traveling salesman problem
+Improving health outcomes through better capacity allocation in a community-based chronic care model
+A simple statistical model and physical device to estimate a woman-specific probability of skilled birth assistance and associated benefit of maternity waiting home stay
+Efficient and Targeted COVID-19 Border Testing via Reinforcement Learning
+Policy optimization for personalized interventions in behavioral health
+Field Study in Deploying Restless Multi-Armed Bandits: Assisting Non-Profits in Improving Maternal and Child Health
+The Best Decisions Are Not the Best Advice: Making Adherence-Aware Recommendations
+Overcoming Algorithm Aversion: People Will Use Imperfect Algorithms If They Can (Even Slightly) Modify Them
+When combinations of humans and AI are useful: A systematic review and meta-analysis
+Improving Expert Predictions with Conformal Prediction
+Effective Human-AI Teams via Learned Natural Language Rules and Onboarding
+How to Design AI for Social Good: Seven Essential Factors
+Analytics and Bikes: Riding Tandem with Motivate to Improve Mobility
+The Hardness of Achieving Impact in AI for Social Impact Research: A Ground-Level View of Challenges & Opportunities
+Sequential resource allocation for nonprofit operations
+Redesigning VolunteerMatch's Ranking Algorithm: Toward More Equitable Access to Volunteers
+Redesigning Service Level Agreements: Equity and Efficiency in City Government Operations
+Bridging Gaps: Equity in Infrastructure Decisions
+Learning Optimal and Fair Policies for Online Allocation of Scarce Societal Resources from Data Collected in Deployment
+Machine learning and phone data can improve targeting of humanitarian aid
+Expanding Perspectives on Data Privacy: Insights from Rural Togo
+Data-efficient off-policy policy evaluation for reinforcement learning
+Just Trial Once: Ongoing Causal Validation of Machine Learning Models
+Machine Learning Who to Nudge: Causal vs Predictive Targeting in a Field Experiment on Student Financial Aid Renewal
+Understanding Deep Learning Requires Rethinking Generalization
+The Price of Robustness
+A General Algorithm for Deciding Transportability of Experimental Results
+Fostering the Ecosystem of AI for Social Impact Requires Expanding and Strengthening Evaluation Standards
+Measuring the Impact of Early-2025 AI on Experienced Open-Source Developer Productivity
+Optimization Meets Participation: Iterative Zone Generation for School Assignment
+Optimizing schools' start time and bus routes
+Difficult Lessons on Social Prediction from Wisconsin Public Schools
+Dropping Standardized Testing for Admissions Trades Off Information and Access
+Changing the Boston School Choice Mechanism
+Fairness Through Awareness
+Equality of Opportunity in Supervised Learning
+Learning Fair Representations
+Counterfactual Fairness
+Fair Prediction with Disparate Impact
+A Reductions Approach to Fair Classification
+Preventing Fairness Gerrymandering
+Fairness of Exposure in Ranking
+Learning to Rank with Fairness Constraints
+The Measure and Mismeasure of Fairness
+Performative Prediction
+Large language models that replace human participants can harmfully misportray and flatten identity groups
+Fairness in Machine Learning: Lessons from Political Campaigning
+Algorithmic Decision Making and the Challenges of Fairness
+On the Dangers of Stochastic Parrots
+Auditing Black-box Models for Indirect Influence
+Gender Shades: Intersectional Accuracy Disparities in Commercial Gender Classification
+The Cost of Fairness in Binary Classification
+Fairness and Abstraction in Sociotechnical Systems
+Fairness through Awareness and Audit
+The Right to Explanation in Automated Decision-Making
+Equality of Opportunity in Supervised Learning Revisited
+Learning from Fairness Constraints in Classification
+Fairness Constraints for Decision Trees
+Fairness in Algorithmic Decision Making
+Algorithmic Bias Detection and Mitigation: Best Practices and Policies to Reduce Consumer Harms
+The Disparate Impact of Algorithmic Decision Making
+On the Impossibility of Fairness
+Multi-objective Optimization for Fair and Efficient Resource Allocation
+Fair Public Resource Allocation under Budget Constraints
+Equitable Decision Support for Public Sector Operations
+Robust and Fair Machine Learning for Social Impact
+Fairness in Machine Learning: A Survey
+Causal Fairness in Machine Learning
+Learning Fair Representations for Causal Decision Making
